@@ -7,11 +7,31 @@ import hashlib
 # Import temporário
 import time
 
-def chord_node(identifier,location,n):
-    hash_table = dict()
-    finger_table = dict()
+def find_sucessor(node_id,nodes):
+    sucessor = None
+    for node in sorted(nodes):
+        print(nodes.get(node))
+        if int(node) > node_id: 
+            sucessor = node
+            break
+    return sucessor
 
-    print(identifier, location)
+def find_predecessor(node_id, nodes):
+    predecessor = None
+    for node in sorted(nodes):
+        if int(node) < node_id:
+            predecessor = node
+    return predecessor
+
+def chord_node(identifier,location,nodes):
+    hash_table = dict() # Tabela onde ficam as informações armazenadas nesse nó
+    finger_table = dict() # Tabela onde fica a referência para os outros nós 
+
+    sucessor = find_sucessor(int(identifier), nodes)
+    predecessor = find_predecessor(int(identifier), nodes)
+        
+    print("[Node {0}] Sucessor is {1}".format(identifier,sucessor))
+    print("[Node {0}] Predecessor is {1}".format(identifier,predecessor))
 
     # Espera ocupada
     a = -50
@@ -34,7 +54,7 @@ def spawn_chord_nodes(n):
         node_key = int(node_key,16) % 2**n
         
         # Gerando o nó com as informações geradas
-        proc = Process(target=chord_node,args=(node_key,port,n,))
+        proc = Process(target=chord_node,args=(node_key,port,locations,))
         proc.start()
 
         # Atualizamos as informaçoes das estruturas de retorno 
