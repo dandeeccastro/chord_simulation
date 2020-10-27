@@ -7,7 +7,7 @@ import hashlib
 # Import temporário
 import time
 
-def chord_node(identifier,location):
+def chord_node(identifier,location,n):
     hash_table = dict()
     finger_table = dict()
 
@@ -20,21 +20,26 @@ def chord_node(identifier,location):
 
 def spawn_chord_nodes(n):
 
+    # Variáveis que serão retornadas no fim da função mais outras de uso no loop
     spawn_array = []
     locations = dict()
-    port = 4200 # TODO talvez mudar isso aqui depois
+    port = 4200 
     sha1 = hashlib.sha1()
 
     for i in range(0,n):
+        # Gerando informações do nó que será gerado
         node_location = "localhost " + str(port)
         sha1.update(bytes(node_location,encoding='utf-8'))
         node_key = sha1.hexdigest()
-        proc = Process(target=chord_node,args=(node_key,port,))
+        node_key = int(node_key,16) % 2**n
+        
+        # Gerando o nó com as informações geradas
+        proc = Process(target=chord_node,args=(node_key,port,n,))
         proc.start()
 
+        # Atualizamos as informaçoes das estruturas de retorno 
         spawn_array.append(proc)
         locations[node_key] = node_location
-
         port += 1
 
     return locations, spawn_array
