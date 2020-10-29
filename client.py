@@ -14,10 +14,10 @@ def string_to_address(x):
     x = x.split()
     return (x[0],int(x[1]))
 
-def find_sucessor(node_id,nodes):
+def find_sucessor(node_id):
     sucessor = None
-    for node in sorted(nodes):
-        print(nodes.get(node))
+    for node in sorted(locations):
+        print(locations.get(node))
         if int(node) > node_id: 
             sucessor = node
             break
@@ -27,7 +27,7 @@ def chord_node(identifier,location,nodes):
     hash_table = dict() # Tabela onde ficam as informações armazenadas nesse nó
     finger_table = dict() # Tabela onde fica a referência para os outros nós 
 
-    sucessor = find_sucessor(int(identifier), nodes)
+    sucessor = find_sucessor(int(identifier))
 
     sock = socket.socket()
     sock.bind(('localhost',location))
