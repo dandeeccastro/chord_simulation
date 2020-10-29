@@ -21,9 +21,11 @@ def find_sucessor(node_id):
         if int(node) > node_id: 
             sucessor = node
             break
+    if sucessor is None:
+        sucessor = sorted(locations)[0]
     return sucessor
 
-def chord_node(identifier,location,nodes):
+def chord_node(identifier,location):
     hash_table = dict() # Tabela onde ficam as informações armazenadas nesse nó
     finger_table = dict() # Tabela onde fica a referência para os outros nós 
 
@@ -58,17 +60,19 @@ def spawn_chord_nodes(n):
         sha1.update(bytes(node_location,encoding='utf-8'))
         node_key = sha1.hexdigest()
         node_key = int(node_key,16) % 2**n
-        
-        # Gerando o nó com as informações geradas
-        proc = Process(target=chord_node,args=(node_key,port,locations,))
-        proc.start()
-
-        # Atualizamos as informaçoes das estruturas de retorno 
-        spawn_array.append(proc)
         locations[node_key] = node_location
         while port in ports:
             port = random.randint(4201,5000)
         ports.append(port)
+        
+    for node_key in locations:
+        # Gerando o nó com as informações geradas
+        port = int(locations[node_key].split()[1])
+        proc = Process(target=chord_node,args=(node_key,port,))
+        proc.start()
+
+        # Atualizamos as informaçoes das estruturas de retorno 
+        spawn_array.append(proc)
 
     return spawn_array
 
