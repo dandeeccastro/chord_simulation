@@ -9,7 +9,22 @@ import random
 import time
 
 locations = dict()
+N = None
 sha1 = hashlib.sha1()
+
+def closest_to_finger_table(node_id, finger_table):
+    result = None
+    diff_arr = []
+    for node in sorted(finger_table.values()):
+        diff_arr.append(abs(node - node_id))
+    lesser_diff = sorted(diff_arr)[0]
+    index = diff_arr.index(lesser_diff)
+    i = 0
+    for node in finger_table.values():
+        if i == index:
+            result = node
+        i += 1
+    return result
 
 def string_to_address(x):
     x = x.split()
@@ -25,20 +40,19 @@ def find_sucessor(node_id):
         sucessor = sorted(locations)[0]
     return sucessor
 
-def chord_node(identifier,location):
+def chord_node(identifier,location,NN):
+    # Gerando as informações importantes para o nó
     hash_table = dict() # Tabela onde ficam as informações armazenadas nesse nó
     finger_table = dict() # Tabela onde fica a referência para os outros nós 
-
     sucessor = find_sucessor(int(identifier))
+    for i in range(0,NN):
+        node_id = identifier + 2**i
+        node_id %= 2**NN
+        finger_table[node_id] = find_sucessor(node_id)
 
     sock = socket.socket()
     sock.bind(('localhost',location))
     sock.listen(1)
-
-    for i in range(0,len(locations.values())):
-        node_id = identifier + 2**i
-        node_id %= 2**len(locations.values())
-        finger_table[node_id] = find_sucessor(node_id)
         
     print("[Node {0}] Sucessor is {1}".format(identifier,sucessor))
     print("[Node {0}] {1}".format(identifier,finger_table))
@@ -50,22 +64,26 @@ def chord_node(identifier,location):
             msg_blob = new_sock.recv(1024)
             msg_blob = str(msg_blob,encoding='utf-8')
             msg = msg_blob.split()
+
             if msg[0] == 'insert':
                 value = ' '.join(msg[2:])
                 sha1.update(bytes(value,encoding='utf-8'))
                 hash_value = sha1.hexdigest()
-                hash_value = int(hash_value,16) % 2**len(locations.values())
+                hash_value = int(hash_value,16) % 2**NN
                 dest_node = find_sucessor(hash_value)
-                print(dest_node)
+
                 if dest_node == identifier:
                     hash_table[hash_value] = value
                     new_sock.send(b"INSERTED")
                     print(hash_table)
+
                 else:
                     # Aqui a gente seguiria com a busca, mas n rola por enquanto
                     forward_sock = socket.socket()
-                    dest_info = string_to_address(locations[dest_node])
+                    dest_node = closest_to_finger_table(hash_value, finger_table)
+                    dest_info = string_to_address(locations[int(dest_node)])
                     forward_sock.connect(dest_info)
+                    print('insert ' + str(dest_node) + ' ' + value)
                     forward_sock.send(bytes('insert ' + str(dest_node) + ' ' + value,encoding='utf-8'))
                     response = forward_sock.recv(1024)
                     new_sock.send(response)
@@ -89,11 +107,11 @@ def spawn_chord_nodes(n):
         while port in ports:
             port = random.randint(4201,5000)
         ports.append(port)
-        
+    N = len(locations.values()) 
     for node_key in locations:
         # Gerando o nó com as informações geradas
         port = int(locations[node_key].split()[1])
-        proc = Process(target=chord_node,args=(node_key,port,))
+        proc = Process(target=chord_node,args=(node_key,port,len(locations)))
         proc.start()
 
         # Atualizamos as informaçoes das estruturas de retorno 
@@ -108,16 +126,19 @@ def run_client_interface():
         command_blob = input()
         command = command_blob.split()
         address = string_to_address(locations[int(command[1])]) if len(command) > 1 else None
+
         if command[0] == "query":
             sock.connect(address)
             sock.send(b"salve")
             print("this should query the network")
+
         elif command[0] == "insert":
             sock.connect(address)
             sock.send(bytes(command_blob,encoding='utf-8'))
             response = sock.recv(1024)
             response = str(response, encoding='utf-8')
             print(response)
+
         elif command[0] == "close" or command == "quit":
             for address in locations.values():
                 sock.connect(string_to_address(address))
