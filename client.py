@@ -17,7 +17,6 @@ def string_to_address(x):
 def find_sucessor(node_id):
     sucessor = None
     for node in sorted(locations):
-        print(locations.get(node))
         if int(node) > node_id: 
             sucessor = node
             break
@@ -34,8 +33,14 @@ def chord_node(identifier,location):
     sock = socket.socket()
     sock.bind(('localhost',location))
     sock.listen(1)
+
+    for i in range(0,len(locations.values())):
+        node_id = identifier + 2**i
+        node_id %= 2**len(locations.values())
+        finger_table[node_id] = find_sucessor(node_id)
         
     print("[Node {0}] Sucessor is {1}".format(identifier,sucessor))
+    print("[Node {0}] {1}".format(identifier,finger_table))
 
     r,w,x = select.select([sock],[],[])
     for command in r:
@@ -105,8 +110,6 @@ if __name__ == "__main__":
     n = int(input("Insira o número de nós que quer na sua rede: "))
     nodes = spawn_chord_nodes( n )
 
-    print()
-    
     run_client_interface()
 
     # Espero os processos terminarem (necessário?)
