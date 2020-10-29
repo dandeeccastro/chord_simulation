@@ -60,9 +60,16 @@ def chord_node(identifier,location):
                 if dest_node == identifier:
                     hash_table[hash_value] = value
                     new_sock.send(b"INSERTED")
+                    print(hash_table)
                 else:
                     # Aqui a gente seguiria com a busca, mas n rola por enquanto
-                    new_sock.send(b"TODO ADD ROUTING")
+                    forward_sock = socket.socket()
+                    dest_info = string_to_address(locations[dest_node])
+                    forward_sock.connect(dest_info)
+                    forward_sock.send(bytes('insert ' + str(dest_node) + ' ' + value,encoding='utf-8'))
+                    response = forward_sock.recv(1024)
+                    new_sock.send(response)
+
 
 def spawn_chord_nodes(n):
 
