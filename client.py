@@ -7,6 +7,10 @@ import hashlib
 # Import temporário
 import time
 
+def string_to_address(x):
+    x = x.split()
+    return (x[0],int(x[1]))
+
 def find_sucessor(node_id,nodes):
     sucessor = None
     for node in sorted(nodes):
@@ -29,14 +33,22 @@ def chord_node(identifier,location,nodes):
 
     sucessor = find_sucessor(int(identifier), nodes)
     predecessor = find_predecessor(int(identifier), nodes)
+
+    sock = socket.socket()
+    sock.bind(('localhost',location))
+    sock.listen(1)
         
     print("[Node {0}] Sucessor is {1}".format(identifier,sucessor))
     print("[Node {0}] Predecessor is {1}".format(identifier,predecessor))
 
-    # Espera ocupada
-    a = -50
-    for i in range(0,100000):
-        a += 1 
+    r,w,x = select.select([sock],[],[])
+    for command in r:
+        if command == sock:
+            new_sock, addr = sock.accept()
+
+            msg = new_sock.recv(1024)
+            msg = str(msg,encoding='utf-8')
+            print(msg)
 
 def spawn_chord_nodes(n):
 
@@ -65,15 +77,26 @@ def spawn_chord_nodes(n):
     return locations, spawn_array
 
 def run_client_interface(addresses):
-    sock = socket.socket()
 
     while True:
+        sock = socket.socket()
         command = input()
-        if command == "query":
+        command = command.split()
+        address = string_to_address(addresses[int(command[1])]) if len(command) > 1 else None
+        if command[0] == "query":
+            sock.connect(address)
+            sock.send(b"salve")
             print("this should query the network")
-        elif command == "insert":
+        elif command[0] == "insert":
             print("this should add to the network")
-        elif command == "close" or command == "quit":
+        elif command[0] == "close" or command == "quit":
+            for address in addresses.values():
+                sock.connect(string_to_address(address))
+                sock.send(b"QUIT")
+                msg = sock.recv(1024)
+                msg = str(msg,encoding='utf-8')
+                print(msg)
+                sock = socket.socket()
             print("goodbye world")
             return 0
 
