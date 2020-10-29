@@ -3,6 +3,7 @@ import sys
 import select 
 from multiprocessing import Process 
 import hashlib
+import random
 
 # Import temporário
 import time
@@ -55,8 +56,9 @@ def spawn_chord_nodes(n):
     # Variáveis que serão retornadas no fim da função mais outras de uso no loop
     spawn_array = []
     locations = dict()
-    port = 4200 
+    port = random.randint(4201,5000) 
     sha1 = hashlib.sha1()
+    ports = [port]
 
     for i in range(0,n):
         # Gerando informações do nó que será gerado
@@ -72,7 +74,9 @@ def spawn_chord_nodes(n):
         # Atualizamos as informaçoes das estruturas de retorno 
         spawn_array.append(proc)
         locations[node_key] = node_location
-        port += 1
+        while port in ports:
+            port = random.randint(4201,5000)
+        ports.append(port)
 
     return locations, spawn_array
 
