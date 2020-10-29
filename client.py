@@ -8,6 +8,8 @@ import random
 # Import temporário
 import time
 
+locations = dict()
+
 def string_to_address(x):
     x = x.split()
     return (x[0],int(x[1]))
@@ -21,26 +23,17 @@ def find_sucessor(node_id,nodes):
             break
     return sucessor
 
-def find_predecessor(node_id, nodes):
-    predecessor = None
-    for node in sorted(nodes):
-        if int(node) < node_id:
-            predecessor = node
-    return predecessor
-
 def chord_node(identifier,location,nodes):
     hash_table = dict() # Tabela onde ficam as informações armazenadas nesse nó
     finger_table = dict() # Tabela onde fica a referência para os outros nós 
 
     sucessor = find_sucessor(int(identifier), nodes)
-    predecessor = find_predecessor(int(identifier), nodes)
 
     sock = socket.socket()
     sock.bind(('localhost',location))
     sock.listen(1)
         
     print("[Node {0}] Sucessor is {1}".format(identifier,sucessor))
-    print("[Node {0}] Predecessor is {1}".format(identifier,predecessor))
 
     r,w,x = select.select([sock],[],[])
     for command in r:
@@ -55,7 +48,6 @@ def spawn_chord_nodes(n):
 
     # Variáveis que serão retornadas no fim da função mais outras de uso no loop
     spawn_array = []
-    locations = dict()
     port = random.randint(4201,5000) 
     sha1 = hashlib.sha1()
     ports = [port]
@@ -78,15 +70,15 @@ def spawn_chord_nodes(n):
             port = random.randint(4201,5000)
         ports.append(port)
 
-    return locations, spawn_array
+    return spawn_array
 
-def run_client_interface(addresses):
+def run_client_interface():
 
     while True:
         sock = socket.socket()
         command = input()
         command = command.split()
-        address = string_to_address(addresses[int(command[1])]) if len(command) > 1 else None
+        address = string_to_address(locations[int(command[1])]) if len(command) > 1 else None
         if command[0] == "query":
             sock.connect(address)
             sock.send(b"salve")
@@ -94,7 +86,7 @@ def run_client_interface(addresses):
         elif command[0] == "insert":
             print("this should add to the network")
         elif command[0] == "close" or command == "quit":
-            for address in addresses.values():
+            for address in locations.values():
                 sock.connect(string_to_address(address))
                 sock.send(b"QUIT")
                 msg = sock.recv(1024)
@@ -107,11 +99,11 @@ def run_client_interface(addresses):
 if __name__ == "__main__":
     # Spawno n processos 
     n = int(input("Insira o número de nós que quer na sua rede: "))
-    addresses, nodes = spawn_chord_nodes( n )
+    nodes = spawn_chord_nodes( n )
 
-    print(addresses)
+    print()
     
-    run_client_interface(addresses)
+    run_client_interface()
 
     # Espero os processos terminarem (necessário?)
     for node in nodes:
