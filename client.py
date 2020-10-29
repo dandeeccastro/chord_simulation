@@ -9,6 +9,7 @@ import random
 import time
 
 locations = dict()
+sha1 = hashlib.sha1()
 
 def string_to_address(x):
     x = x.split()
@@ -46,10 +47,22 @@ def chord_node(identifier,location):
     for command in r:
         if command == sock:
             new_sock, addr = sock.accept()
-
-            msg = new_sock.recv(1024)
-            msg = str(msg,encoding='utf-8')
-            print(msg)
+            msg_blob = new_sock.recv(1024)
+            msg_blob = str(msg_blob,encoding='utf-8')
+            msg = msg_blob.split()
+            if msg[0] == 'insert':
+                value = ' '.join(msg[2:])
+                sha1.update(bytes(value,encoding='utf-8'))
+                hash_value = sha1.hexdigest()
+                hash_value = int(hash_value,16) % 2**len(locations.values())
+                dest_node = find_sucessor(hash_value)
+                print(dest_node)
+                if dest_node == identifier:
+                    hash_table[hash_value] = value
+                    new_sock.send(b"INSERTED")
+                else:
+                    # Aqui a gente seguiria com a busca, mas n rola por enquanto
+                    new_sock.send(b"TODO ADD ROUTING")
 
 def spawn_chord_nodes(n):
 
@@ -85,15 +98,19 @@ def run_client_interface():
 
     while True:
         sock = socket.socket()
-        command = input()
-        command = command.split()
+        command_blob = input()
+        command = command_blob.split()
         address = string_to_address(locations[int(command[1])]) if len(command) > 1 else None
         if command[0] == "query":
             sock.connect(address)
             sock.send(b"salve")
             print("this should query the network")
         elif command[0] == "insert":
-            print("this should add to the network")
+            sock.connect(address)
+            sock.send(bytes(command_blob,encoding='utf-8'))
+            response = sock.recv(1024)
+            response = str(response, encoding='utf-8')
+            print(response)
         elif command[0] == "close" or command == "quit":
             for address in locations.values():
                 sock.connect(string_to_address(address))
