@@ -94,11 +94,34 @@ def chord_node(identifier,location,NN):
                         forward_sock.close()
 
                 elif msg[0] == 'query':
-                    if msg[2] == 'all':
+                    if msg[2] == 'values':
                         result = ""
                         for item in hash_table:
                             result += str(item) + '\t' + str(hash_table[item]) + '\n'
                         new_sock.send(result.encode('utf-8'))
+
+                    elif msg[2] == 'value':
+                        value = ' '.join(msg[3:])
+                        sha1 = hashlib.sha1()
+                        sha1.update(bytes(value,encoding='utf-8'))
+                        hash_value = sha1.hexdigest()
+                        hash_value = int(hash_value,16) % 2**NN
+
+                        if predecessor <= hash_value and hash_value < identifier:
+                            response = hash_table[hash_value] 
+                            new_sock.send(response.encode('utf-8'))
+
+                        else:
+                            # Aqui a gente seguiria com a busca, mas n rola por enquanto
+                            forward_sock = socket.socket()
+                            dest_node = lookup_finger_table(hash_value,identifier,finger_table)
+                            print('[Node {0}] forwarding query to {1}'.format(identifier,dest_node))
+                            dest_info = string_to_address(locations[int(dest_node)])
+                            forward_sock.connect(dest_info)
+                            forward_sock.send(bytes('query ' + str(dest_node) + ' value ' + value,encoding='utf-8'))
+                            response = forward_sock.recv(1024)
+                            new_sock.send(response)
+                            forward_sock.close()
 
                 new_sock.close()
 
@@ -139,19 +162,12 @@ def run_client_interface():
         sock = socket.socket()
         command_blob = input()
         command = command_blob.split()
-        address = string_to_address(locations[int(command[1])]) if len(command) > 1 else None
 
-        if command[0] == "query":
+        if command[0] == "query" or command[0] == 'insert':
+            address = string_to_address(locations[int(command[1])]) if len(command) > 1 else None
             sock.connect(address)
             sock.send(command_blob.encode('utf-8'))
             response = sock.recv(1024).decode('utf-8')
-            print(response)
-
-        elif command[0] == "insert":
-            sock.connect(address)
-            sock.send(bytes(command_blob,encoding='utf-8'))
-            response = sock.recv(1024)
-            response = str(response, encoding='utf-8')
             print(response)
 
         elif command[0] == "close" or command == "quit":
@@ -163,6 +179,30 @@ def run_client_interface():
                 print(msg)
                 sock = socket.socket()
             return 0
+
+        elif command[0] == 'help':
+            if len(command) == 1:
+                print("Lista de comandos: insert, query, help")
+                print("help <comando>: Mostra informações de uso do comando desejado. Se usado sozinho, mostra a lista de comandos disponíveis para uso")
+            else:
+                if command[1] == 'insert':
+                    print("insert <id do nó> <valor a ser inserido>: Insere o valor na rede, iniciando o processo no nó escolhido")
+                    print("Ao receber esse comando, o nó faz o hash do valor e roteia o valor até que ele chegue no nó que deve armazená-lo")
+                    print("Para saber os ids de nó disponíveis, use o comando list")
+                elif command[1] == 'query':
+                    print("query <id do nó> <id da busca>: Pesquisa por algo no sistema, começando pelo ID especificado e de acordo com o ID de busca")
+                    print("IDs de busca disponíveis: \n\t- values: mostra os valores armazenados em um nó específico")
+                    print("\t- value <valor a ser pesquisado>: pesquisa pelo valor nos nós da rede, roteando a requisição se necessário")
+                elif command[1] == 'list':
+                    print("list: Lista os IDs disponíveis para serem usados")
+                else:
+                    print("{0}: Comando não reconhecido no sistema".format(command[1]))
+
+        elif command[0] == 'list':
+            result = ''
+            for node in locations.keys():
+                result = result + str(node) + ' '
+            print(result)
 
         del sock
 
