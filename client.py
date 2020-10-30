@@ -19,7 +19,7 @@ def generate_sucessor(node_id):
     for node in list(sorted(locations.keys())):
         if node > node_id:
             return node
-    return list(sorted(locations.keys()))[-1]
+    return list(sorted(locations.keys()))[0]
 
 def chord_node(identifier,location,NN):
     # Gerando as informações importantes para o nó
@@ -37,7 +37,6 @@ def chord_node(identifier,location,NN):
     sock.listen(1)
         
     print("[Node {0}] Sucessor is {1}".format(identifier,sucessor))
-    print("[Node {0}] {1}".format(identifier,finger_table))
 
     while True:
         r,w,x = select.select([sock],[],[])
@@ -151,6 +150,7 @@ if __name__ == "__main__":
     n = int(input("Insira o número de nós que quer na sua rede: "))
     nodes = spawn_chord_nodes( n )
 
+    print('[Client] {0}'.format(list(locations.keys())))
     run_client_interface()
 
     # Espero os processos terminarem (necessário?)
