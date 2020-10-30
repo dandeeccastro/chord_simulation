@@ -10,62 +10,27 @@ import time
 
 locations = dict()
 N = None
-sha1 = hashlib.sha1()
-
-def closest_to_finger_table(node_id, finger_table):
-    if node_id in finger_table:
-        result = node_id
-    else:
-        result = None
-        diff = float('inf') # Número alto arbitrário
-        for node in finger_table.values():
-            x = node - node_id 
-            if x < 0:
-                x += 2**len(locations)
-            if x < diff:
-                result = node
-                diff = abs(node - node_id)
-    return result
 
 def string_to_address(x):
     x = x.split()
     return (x[0],int(x[1]))
 
-def find_sucessor(node_id):
-    sucessor = None
-    for node in sorted(locations):
-        if int(node) > node_id: 
-            sucessor = node
-            break
-    if sucessor is None:
-        sucessor = sorted(locations)[0]
-    return sucessor
-
-def find_location_for_id(node_id):
-    if node_id in locations:
-        result = node_id
-    else:
-        result = None
-        diff = float('inf') # Número alto arbitrário
-        for node in locations:
-            x = node - node_id 
-            if x < 0:
-                x += 2**len(locations)
-            if x < diff:
-                result = node
-                diff = abs(node - node_id)
-    return result
+def generate_sucessor(node_id):
+    for node in list(sorted(locations.keys())):
+        if node > node_id:
+            return node
+    return list(sorted(locations.keys()))[-1]
 
 def chord_node(identifier,location,NN):
     # Gerando as informações importantes para o nó
     hash_table = dict() # Tabela onde ficam as informações armazenadas nesse nó
     finger_table = dict() # Tabela onde fica a referência para os outros nós 
-    sucessor = find_sucessor(int(identifier))
+    sucessor = generate_sucessor(int(identifier))
 
     for i in range(0,NN):
         node_id = identifier + 2**i
         node_id %= 2**NN
-        finger_table[node_id] = find_sucessor(node_id)
+        finger_table[node_id] = generate_sucessor(node_id)
 
     sock = socket.socket()
     sock.bind(('localhost',location))
@@ -85,21 +50,22 @@ def chord_node(identifier,location,NN):
 
                 if msg[0] == 'insert':
                     value = ' '.join(msg[2:])
+                    sha1 = hashlib.sha1()
                     sha1.update(bytes(value,encoding='utf-8'))
                     hash_value = sha1.hexdigest()
                     hash_value = int(hash_value,16) % 2**NN
-                    dest_node = find_location_for_id(hash_value)
-                    print(dest_node)
 
-                    if dest_node == identifier:
+                    temp_sucessor = sucessor if sucessor > identifier else sucessor + 2**len(locations)
+                    if identifier <= hash_value and hash_value < temp_sucessor:
                         hash_table[hash_value] = value
                         new_sock.send(b"INSERTED")
-                        print(identifier,hash_table)
+                        print('[Node {0}] updated hash_table: {1}'.format(identifier,hash_table))
 
                     else:
                         # Aqui a gente seguiria com a busca, mas n rola por enquanto
                         forward_sock = socket.socket()
-                        dest_node = closest_to_finger_table(hash_value, finger_table)
+                        dest_node = sucessor
+                        print('[Node {0}] forwarding insert to {1}'.format(identifier,dest_node))
                         dest_info = string_to_address(locations[int(dest_node)])
                         forward_sock.connect(dest_info)
                         forward_sock.send(bytes('insert ' + str(dest_node) + ' ' + value,encoding='utf-8'))
@@ -121,12 +87,12 @@ def spawn_chord_nodes(n):
     # Variáveis que serão retornadas no fim da função mais outras de uso no loop
     spawn_array = []
     port = random.randint(4201,5000) 
-    sha1 = hashlib.sha1()
     ports = [port]
 
     for i in range(0,n):
         # Gerando informações do nó que será gerado
         node_location = "localhost " + str(port)
+        sha1 = hashlib.sha1()
         sha1.update(bytes(node_location,encoding='utf-8'))
         node_key = sha1.hexdigest()
         node_key = int(node_key,16) % 2**n
