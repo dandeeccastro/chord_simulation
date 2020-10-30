@@ -14,16 +14,11 @@ sha1 = hashlib.sha1()
 
 def closest_to_finger_table(node_id, finger_table):
     result = None
-    diff_arr = []
+    diff = float('inf') # Número alto arbitrário
     for node in sorted(finger_table.values()):
-        diff_arr.append(abs(node - node_id))
-    lesser_diff = sorted(diff_arr)[0]
-    index = diff_arr.index(lesser_diff)
-    i = 0
-    for node in finger_table.values():
-        if i == index:
+        if abs(node - node_id) < diff:
             result = node
-        i += 1
+            diff = abs(node - node_id)
     return result
 
 def string_to_address(x):
@@ -45,6 +40,7 @@ def chord_node(identifier,location,NN):
     hash_table = dict() # Tabela onde ficam as informações armazenadas nesse nó
     finger_table = dict() # Tabela onde fica a referência para os outros nós 
     sucessor = find_sucessor(int(identifier))
+
     for i in range(0,NN):
         node_id = identifier + 2**i
         node_id %= 2**NN
