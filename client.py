@@ -53,37 +53,39 @@ def chord_node(identifier,location,NN):
     print("[Node {0}] Sucessor is {1}".format(identifier,sucessor))
     print("[Node {0}] {1}".format(identifier,finger_table))
 
-    r,w,x = select.select([sock],[],[])
-    for command in r:
-        if command == sock:
-            new_sock, addr = sock.accept()
-            msg_blob = new_sock.recv(1024)
-            msg_blob = str(msg_blob,encoding='utf-8')
-            msg = msg_blob.split()
+    while True:
+        r,w,x = select.select([sock],[],[])
+        for command in r:
+            if command == sock:
+                new_sock, addr = sock.accept()
+                msg_blob = new_sock.recv(1024)
+                msg_blob = str(msg_blob,encoding='utf-8')
+                msg = msg_blob.split()
 
-            if msg[0] == 'insert':
-                value = ' '.join(msg[2:])
-                sha1.update(bytes(value,encoding='utf-8'))
-                hash_value = sha1.hexdigest()
-                hash_value = int(hash_value,16) % 2**NN
-                dest_node = find_sucessor(hash_value)
+                if msg[0] == 'insert':
+                    value = ' '.join(msg[2:])
+                    sha1.update(bytes(value,encoding='utf-8'))
+                    hash_value = sha1.hexdigest()
+                    hash_value = int(hash_value,16) % 2**NN
+                    dest_node = find_sucessor(hash_value)
 
-                if dest_node == identifier:
-                    hash_table[hash_value] = value
-                    new_sock.send(b"INSERTED")
-                    print(hash_table)
+                    if dest_node == identifier:
+                        hash_table[hash_value] = value
+                        new_sock.send(b"INSERTED")
+                        print(identifier,hash_table)
 
-                else:
-                    # Aqui a gente seguiria com a busca, mas n rola por enquanto
-                    forward_sock = socket.socket()
-                    dest_node = closest_to_finger_table(hash_value, finger_table)
-                    dest_info = string_to_address(locations[int(dest_node)])
-                    forward_sock.connect(dest_info)
-                    print('insert ' + str(dest_node) + ' ' + value)
-                    forward_sock.send(bytes('insert ' + str(dest_node) + ' ' + value,encoding='utf-8'))
-                    response = forward_sock.recv(1024)
-                    new_sock.send(response)
+                    else:
+                        # Aqui a gente seguiria com a busca, mas n rola por enquanto
+                        forward_sock = socket.socket()
+                        dest_node = closest_to_finger_table(hash_value, finger_table)
+                        dest_info = string_to_address(locations[int(dest_node)])
+                        forward_sock.connect(dest_info)
+                        forward_sock.send(bytes('insert ' + str(dest_node) + ' ' + value,encoding='utf-8'))
+                        response = forward_sock.recv(1024)
+                        new_sock.send(response)
+                        forward_sock.close()
 
+                new_sock.close()
 
 def spawn_chord_nodes(n):
 
@@ -145,6 +147,8 @@ def run_client_interface():
                 sock = socket.socket()
             print("goodbye world")
             return 0
+
+        del sock
 
 if __name__ == "__main__":
     # Spawno n processos 
