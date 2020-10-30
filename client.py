@@ -85,6 +85,13 @@ def chord_node(identifier,location,NN):
                         new_sock.send(response)
                         forward_sock.close()
 
+                elif msg[0] == 'query':
+                    if msg[2] == 'all':
+                        result = ""
+                        for item in hash_table:
+                            result += str(item) + '\t' + str(hash_table[item]) + '\n'
+                        new_sock.send(result.encode('utf-8'))
+
                 new_sock.close()
 
 def spawn_chord_nodes(n):
@@ -105,6 +112,7 @@ def spawn_chord_nodes(n):
         while port in ports:
             port = random.randint(4201,5000)
         ports.append(port)
+
     N = len(locations.values()) 
     for node_key in locations:
         # Gerando o nó com as informações geradas
@@ -127,8 +135,9 @@ def run_client_interface():
 
         if command[0] == "query":
             sock.connect(address)
-            sock.send(b"salve")
-            print("this should query the network")
+            sock.send(command_blob.encode('utf-8'))
+            response = sock.recv(1024).decode('utf-8')
+            print(response)
 
         elif command[0] == "insert":
             sock.connect(address)
@@ -145,7 +154,6 @@ def run_client_interface():
                 msg = str(msg,encoding='utf-8')
                 print(msg)
                 sock = socket.socket()
-            print("goodbye world")
             return 0
 
         del sock
