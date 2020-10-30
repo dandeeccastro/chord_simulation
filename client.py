@@ -11,6 +11,17 @@ import time
 locations = dict()
 N = None
 
+def lookup_finger_table(target_id, node_id, finger_table):
+    print('[lookup_finger_table] finger table to be checked: {0}'.format(list(finger_table.values())))
+    node_values = list(finger_table.values())
+    i = len(node_values) -1
+    while i != 0:
+        print('[lookup_finger_table] {0} <= {1} < {2}'.format(node_id,node_values[i],target_id))
+        if node_id <= node_values[i] and node_values[i] < target_id:
+            return node_values[i]
+        i -= 1
+    return node_values[0]
+
 def string_to_address(x):
     x = x.split()
     return (x[0],int(x[1]))
@@ -21,11 +32,22 @@ def generate_sucessor(node_id):
             return node
     return list(sorted(locations.keys()))[0]
 
+def generate_predecessor(node_id):
+    candidate = list(sorted(locations.keys()))[-1]
+    for node in list(sorted(locations.keys())):
+        if node < node_id:
+            candidate = node
+        elif node > node_id:
+            break
+    return candidate
+
+
 def chord_node(identifier,location,NN):
     # Gerando as informações importantes para o nó
     hash_table = dict() # Tabela onde ficam as informações armazenadas nesse nó
     finger_table = dict() # Tabela onde fica a referência para os outros nós 
     sucessor = generate_sucessor(int(identifier))
+    predecessor = generate_predecessor(int(identifier))
 
     for i in range(0,NN):
         node_id = identifier + 2**i
@@ -54,8 +76,7 @@ def chord_node(identifier,location,NN):
                     hash_value = sha1.hexdigest()
                     hash_value = int(hash_value,16) % 2**NN
 
-                    temp_sucessor = sucessor if sucessor > identifier else sucessor + 2**len(locations)
-                    if identifier <= hash_value and hash_value < temp_sucessor:
+                    if predecessor <= hash_value and hash_value < identifier:
                         hash_table[hash_value] = value
                         new_sock.send(b"INSERTED")
                         print('[Node {0}] updated hash_table: {1}'.format(identifier,hash_table))
@@ -63,7 +84,7 @@ def chord_node(identifier,location,NN):
                     else:
                         # Aqui a gente seguiria com a busca, mas n rola por enquanto
                         forward_sock = socket.socket()
-                        dest_node = sucessor
+                        dest_node = lookup_finger_table(hash_value,identifier,finger_table)
                         print('[Node {0}] forwarding insert to {1}'.format(identifier,dest_node))
                         dest_info = string_to_address(locations[int(dest_node)])
                         forward_sock.connect(dest_info)
