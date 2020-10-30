@@ -13,12 +13,18 @@ N = None
 sha1 = hashlib.sha1()
 
 def closest_to_finger_table(node_id, finger_table):
-    result = None
-    diff = float('inf') # Número alto arbitrário
-    for node in sorted(finger_table.values()):
-        if abs(node - node_id) < diff:
-            result = node
-            diff = abs(node - node_id)
+    if node_id in finger_table:
+        result = node_id
+    else:
+        result = None
+        diff = float('inf') # Número alto arbitrário
+        for node in finger_table.values():
+            x = node - node_id 
+            if x < 0:
+                x += 2**len(locations)
+            if x < diff:
+                result = node
+                diff = abs(node - node_id)
     return result
 
 def string_to_address(x):
@@ -34,6 +40,21 @@ def find_sucessor(node_id):
     if sucessor is None:
         sucessor = sorted(locations)[0]
     return sucessor
+
+def find_location_for_id(node_id):
+    if node_id in locations:
+        result = node_id
+    else:
+        result = None
+        diff = float('inf') # Número alto arbitrário
+        for node in locations:
+            x = node - node_id 
+            if x < 0:
+                x += 2**len(locations)
+            if x < diff:
+                result = node
+                diff = abs(node - node_id)
+    return result
 
 def chord_node(identifier,location,NN):
     # Gerando as informações importantes para o nó
@@ -67,7 +88,8 @@ def chord_node(identifier,location,NN):
                     sha1.update(bytes(value,encoding='utf-8'))
                     hash_value = sha1.hexdigest()
                     hash_value = int(hash_value,16) % 2**NN
-                    dest_node = find_sucessor(hash_value)
+                    dest_node = find_location_for_id(hash_value)
+                    print(dest_node)
 
                     if dest_node == identifier:
                         hash_table[hash_value] = value
