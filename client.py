@@ -4,6 +4,7 @@ import select
 from multiprocessing import Process 
 import hashlib
 import random
+import re
 
 # Import temporário
 import time
@@ -12,11 +13,9 @@ locations = dict()
 N = None
 
 def lookup_finger_table(target_id, node_id, finger_table):
-    print('[lookup_finger_table] finger table to be checked: {0}'.format(list(finger_table.values())))
     node_values = list(finger_table.values())
     i = len(node_values) -1
     while i != 0:
-        print('[lookup_finger_table] {0} <= {1} < {2}'.format(node_id,node_values[i],target_id))
         if node_id <= node_values[i] and node_values[i] < target_id:
             return node_values[i]
         i -= 1
@@ -57,10 +56,11 @@ def chord_node(identifier,location,NN):
     sock = socket.socket()
     sock.bind(('localhost',location))
     sock.listen(1)
-        
-    print("[Node {0}] Sucessor is {1}".format(identifier,sucessor))
 
+    closed = False
     while True:
+        if closed:
+            break
         r,w,x = select.select([sock],[],[])
         for command in r:
             if command == sock:
@@ -76,6 +76,7 @@ def chord_node(identifier,location,NN):
                     hash_value = sha1.hexdigest()
                     hash_value = int(hash_value,16) % 2**NN
 
+                    temp_predecessor = predecessor if predecessor < identifier else predecessor - 2**len(locations)
                     if predecessor <= hash_value and hash_value < identifier:
                         hash_table[hash_value] = value
                         new_sock.send(b"INSERTED")
@@ -85,7 +86,7 @@ def chord_node(identifier,location,NN):
                         # Aqui a gente seguiria com a busca, mas n rola por enquanto
                         forward_sock = socket.socket()
                         dest_node = lookup_finger_table(hash_value,identifier,finger_table)
-                        print('[Node {0}] forwarding insert to {1}'.format(identifier,dest_node))
+                        print('[Node {0}] forwarding insert of value with hash {1} to {2}'.format(identifier,hash_value,dest_node))
                         dest_info = string_to_address(locations[int(dest_node)])
                         forward_sock.connect(dest_info)
                         forward_sock.send(bytes('insert ' + str(dest_node) + ' ' + value,encoding='utf-8'))
@@ -107,8 +108,9 @@ def chord_node(identifier,location,NN):
                         hash_value = sha1.hexdigest()
                         hash_value = int(hash_value,16) % 2**NN
 
+                        temp_predecessor = predecessor if predecessor < identifier else predecessor - 2**len(locations)
                         if predecessor <= hash_value and hash_value < identifier:
-                            response = hash_table[hash_value] 
+                            response = str(identifier) + ' contains ' + hash_table[hash_value] 
                             new_sock.send(response.encode('utf-8'))
 
                         else:
@@ -122,6 +124,10 @@ def chord_node(identifier,location,NN):
                             response = forward_sock.recv(1024)
                             new_sock.send(response)
                             forward_sock.close()
+
+                elif msg[0] == 'close' or msg[0] == 'quit':
+                    new_sock.send(b"OK")
+                    closed = True
 
                 new_sock.close()
 
@@ -156,53 +162,81 @@ def spawn_chord_nodes(n):
 
     return spawn_array
 
+def validate_command(message, command):
+    spl_message = message.split()
+    if command == 'insert':
+        regex = re.compile("insert ([0-9])\w+ .*")
+    elif command == 'query':
+        regex = re.compile("query ([0-9])+ value(s .*|)")
+    elif command == 'list' or command == 'help' or command == 'close' or command == 'quit':
+        return True
+    match = regex.match(message)
+    return bool(match)
+        
 def run_client_interface():
 
     while True:
         sock = socket.socket()
         command_blob = input()
         command = command_blob.split()
+        
+        command_is_valid = validate_command(command_blob,command[0])
+        if not command_is_valid:
+            print("[ERRO] Comando {0} inserido de forma invalida! Use o comando help para saber como usar esse comando!".format(command[0]))
 
-        if command[0] == "query" or command[0] == 'insert':
-            address = string_to_address(locations[int(command[1])]) if len(command) > 1 else None
-            sock.connect(address)
-            sock.send(command_blob.encode('utf-8'))
-            response = sock.recv(1024).decode('utf-8')
-            print(response)
+        else:
+            if command[0] == "query":
+                address = string_to_address(locations[int(command[1])]) if len(command) > 1 else None
+                sock.connect(address)
+                sock.send(command_blob.encode('utf-8'))
+                response = sock.recv(1024).decode('utf-8')
+                print(response)
 
-        elif command[0] == "close" or command == "quit":
-            for address in locations.values():
-                sock.connect(string_to_address(address))
-                sock.send(b"QUIT")
-                msg = sock.recv(1024)
-                msg = str(msg,encoding='utf-8')
-                print(msg)
-                sock = socket.socket()
-            return 0
+            elif command[0] == 'insert':
+                address = string_to_address(locations[int(command[1])]) if len(command) > 1 else None
+                sock.connect(address)
+                sock.send(command_blob.encode('utf-8'))
+                response = sock.recv(1024).decode('utf-8')
+                print(response)
 
-        elif command[0] == 'help':
-            if len(command) == 1:
-                print("Lista de comandos: insert, query, help")
-                print("help <comando>: Mostra informações de uso do comando desejado. Se usado sozinho, mostra a lista de comandos disponíveis para uso")
-            else:
-                if command[1] == 'insert':
-                    print("insert <id do nó> <valor a ser inserido>: Insere o valor na rede, iniciando o processo no nó escolhido")
-                    print("Ao receber esse comando, o nó faz o hash do valor e roteia o valor até que ele chegue no nó que deve armazená-lo")
-                    print("Para saber os ids de nó disponíveis, use o comando list")
-                elif command[1] == 'query':
-                    print("query <id do nó> <id da busca>: Pesquisa por algo no sistema, começando pelo ID especificado e de acordo com o ID de busca")
-                    print("IDs de busca disponíveis: \n\t- values: mostra os valores armazenados em um nó específico")
-                    print("\t- value <valor a ser pesquisado>: pesquisa pelo valor nos nós da rede, roteando a requisição se necessário")
-                elif command[1] == 'list':
-                    print("list: Lista os IDs disponíveis para serem usados")
+            elif command[0] == "close" or command[0] == "quit":
+                for address in locations.values():
+                    sock.connect(string_to_address(address))
+                    sock.send(b"close")
+                    msg = sock.recv(1024)
+                    msg = str(msg,encoding='utf-8')
+                    print(msg)
+                    sock = socket.socket()
+                return 0
+
+            elif command[0] == 'help':
+                if len(command) == 1:
+                    print("Lista de comandos: insert, query, help")
+                    print("help <comando>: Mostra informações de uso do comando desejado. Se usado sozinho, mostra a lista de comandos disponíveis para uso")
                 else:
-                    print("{0}: Comando não reconhecido no sistema".format(command[1]))
+                    if command[1] == 'insert':
+                        print("insert <id do nó> <valor a ser inserido>: Insere o valor na rede, iniciando o processo no nó escolhido")
+                        print("Ao receber esse comando, o nó faz o hash do valor e roteia o valor até que ele chegue no nó que deve armazená-lo")
+                        print("Para saber os ids de nó disponíveis, use o comando list")
+                    elif command[1] == 'query':
+                        print("query <id do nó> <id da busca>: Pesquisa por algo no sistema, começando pelo ID especificado e de acordo com o ID de busca")
+                        print("IDs de busca disponíveis: \n\t- values: mostra os valores armazenados em um nó específico")
+                        print("\t- value <valor a ser pesquisado>: pesquisa pelo valor nos nós da rede, roteando a requisição se necessário")
+                    elif command[1] == 'list':
+                        print("list: Lista os IDs disponíveis para serem usados")
+                    elif command[1] == 'close' or command[1] == 'quit':
+                        print("{0}: Espera que todos os processos sejam desligados e fecha o sistema".format(command[1]))
+                    else:
+                        print("{0}: Comando não reconhecido no sistema".format(command[1]))
 
-        elif command[0] == 'list':
-            result = ''
-            for node in locations.keys():
-                result = result + str(node) + ' '
-            print(result)
+            elif command[0] == 'list':
+                result = ''
+                for node in locations.keys():
+                    result = result + str(node) + ' '
+                print(result)
+
+            else:
+                print("Comando desconhecido, tente novamente")
 
         del sock
 
@@ -211,7 +245,8 @@ if __name__ == "__main__":
     n = int(input("Insira o número de nós que quer na sua rede: "))
     nodes = spawn_chord_nodes( n )
 
-    print('[Client] {0}'.format(list(locations.keys())))
+    print("Nós disponíveis: {0}".format(locations.keys()))
+    print("Comandos disponíveis: query, insert, list, help, close, quit")
     run_client_interface()
 
     # Espero os processos terminarem (necessário?)
