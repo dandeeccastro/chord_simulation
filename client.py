@@ -6,9 +6,6 @@ import hashlib
 import random
 import re
 
-# Import temporário
-import time
-
 locations = dict()
 N = None
 
