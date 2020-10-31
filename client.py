@@ -165,7 +165,7 @@ def spawn_chord_nodes(n):
 def validate_command(message, command):
     spl_message = message.split()
     if command == 'insert':
-        regex = re.compile("insert ([0-9])\w+ .*")
+        regex = re.compile("insert ([0-9])+ .*")
     elif command == 'query':
         regex = re.compile("query ([0-9])+ value(s .*|)")
     elif command == 'list' or command == 'help' or command == 'close' or command == 'quit':
